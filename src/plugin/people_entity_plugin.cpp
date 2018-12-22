@@ -23,23 +23,9 @@ namespace ltm_samples
         _log_prefix = "[LTM][People Entity]: ";
         ROS_DEBUG_STREAM(_log_prefix << "plugin initialized with ns: " << param_ns);
 
-        build_null(_null_e);
-
-        // all fields
-        _field_names.insert("name");
-        _field_names.insert("last_name");
-        _field_names.insert("genre");
-        _field_names.insert("country");
-        _field_names.insert("city");
-        _field_names.insert("birthday");
-        _field_names.insert("age");
-        // _field_names.insert("body");
-        // _field_names.insert("face");
-        _field_names.insert("emotion");
-        _field_names.insert("stance");
-        _field_names.insert("is_nerd");
-        _field_names.insert("last_seen");
-        _field_names.insert("last_interacted");
+        // init fields
+        build_null(this->_null_e);
+        fill_field_names(this->_field_names);
 
         // parameters
         ltm::util::ParameterServerWrapper psw("~");
@@ -174,7 +160,7 @@ namespace ltm_samples
         this->ltm_get_registry(log.episode_uids);
 
         // TODO: WE CAN USE A CACHE FOR RECENT ENTITIES
-        EntityMsg curr = _null_e;
+        EntityMsg curr = this->_null_e;
         EntityWithMetadataPtr curr_with_md;
         curr.meta.uid = msg.meta.uid;
         curr.meta.log_uid = log.log_uid;
@@ -205,20 +191,20 @@ namespace ltm_samples
 
         EntityMsg diff;
         diff.meta = curr.meta;
-        entity::update_field<std::string>(log, "name", curr.name, diff.name, msg.name, _null_e.name);
-        entity::update_field<std::string>(log, "last_name", curr.last_name, diff.last_name, msg.last_name, _null_e.last_name);
-        entity::update_field<uint8_t>(log, "age", curr.age, diff.age, msg.age, _null_e.age);
-        entity::update_field<uint8_t>(log, "genre", curr.genre, diff.genre, msg.genre, _null_e.genre);
-        entity::update_field<std::string>(log, "country", curr.country, diff.country, msg.country, _null_e.country);
-        entity::update_field<std::string>(log, "city", curr.city, diff.city, msg.city, _null_e.city);
-        entity::update_field<ltm::Date>(log, "birthday", curr.birthday, diff.birthday, msg.birthday, _null_e.birthday);
-        entity::update_field<sensor_msgs::Image>(log, "face", curr.face, diff.face, msg.face, _null_e.face);
-        entity::update_field<sensor_msgs::Image>(log, "body", curr.body, diff.body, msg.body, _null_e.body);
-        entity::update_field<std::string>(log, "emotion", curr.emotion, diff.emotion, msg.emotion, _null_e.emotion);
-        entity::update_field<std::string>(log, "stance", curr.stance, diff.stance, msg.stance, _null_e.stance);
-        entity::update_field<uint8_t>(log, "is_nerd", curr.is_nerd, diff.is_nerd, msg.is_nerd, _null_e.is_nerd);
-        entity::update_field<ros::Time>(log, "last_seen", curr.last_seen, diff.last_seen, msg.last_seen, _null_e.last_seen);
-        entity::update_field<ros::Time>(log, "last_interacted", curr.last_interacted, diff.last_interacted, msg.last_interacted, _null_e.last_interacted);
+        entity::update_field<std::string>(log, "name", curr.name, diff.name, msg.name, this->_null_e.name);
+        entity::update_field<std::string>(log, "last_name", curr.last_name, diff.last_name, msg.last_name, this->_null_e.last_name);
+        entity::update_field<uint8_t>(log, "age", curr.age, diff.age, msg.age, this->_null_e.age);
+        entity::update_field<uint8_t>(log, "genre", curr.genre, diff.genre, msg.genre, this->_null_e.genre);
+        entity::update_field<std::string>(log, "country", curr.country, diff.country, msg.country, this->_null_e.country);
+        entity::update_field<std::string>(log, "city", curr.city, diff.city, msg.city, this->_null_e.city);
+        entity::update_field<ltm::Date>(log, "birthday", curr.birthday, diff.birthday, msg.birthday, this->_null_e.birthday);
+        entity::update_field<sensor_msgs::Image>(log, "face", curr.face, diff.face, msg.face, this->_null_e.face);
+        entity::update_field<sensor_msgs::Image>(log, "body", curr.body, diff.body, msg.body, this->_null_e.body);
+        entity::update_field<std::string>(log, "emotion", curr.emotion, diff.emotion, msg.emotion, this->_null_e.emotion);
+        entity::update_field<std::string>(log, "stance", curr.stance, diff.stance, msg.stance, this->_null_e.stance);
+        entity::update_field<uint8_t>(log, "is_nerd", curr.is_nerd, diff.is_nerd, msg.is_nerd, this->_null_e.is_nerd);
+        entity::update_field<ros::Time>(log, "last_seen", curr.last_seen, diff.last_seen, msg.last_seen, this->_null_e.last_seen);
+        entity::update_field<ros::Time>(log, "last_interacted", curr.last_interacted, diff.last_interacted, msg.last_interacted, this->_null_e.last_interacted);
 
         size_t n_added = log.new_f.size();
         size_t n_updated = log.updated_f.size();
@@ -245,141 +231,39 @@ namespace ltm_samples
         this->_registry.insert(reg);
     }
 
-    void PeopleEntityPlugin::retrace(EntityMsg &entity, const std::vector<uint32_t> &logs) {
-        // ROS_WARN_STREAM("...RETRACING FROM PLUGIN...");
-        entity = this->_null_e;
-
-        std::set<std::string> acquired_fields;
-        std::set<std::string> remaining_fields = _field_names;
-        uint32_t entity_uid = 0;
-
-        std::vector<std::string> all_fields(remaining_fields.begin(), remaining_fields.end());
-        // ROS_INFO_STREAM("ALL FIELDS (total=" << all_fields.size() << "): " << ltm::util::vector_to_str(all_fields));
-
-        std::vector<uint32_t>::const_iterator it;
-        for (it = logs.begin(); it != logs.end(); ++it) {
-            LogType log;
-            this->ltm_get_log(*it, log);
-            entity_uid = log.entity_uid;
-            // ROS_WARN_STREAM("Got log: " << log.log_uid << " for entity " << log.entity_uid);
-
-            EntityWithMetadataPtr diff;
-            bool loaded = false;
-
-            std::set<std::string>::iterator f_it;
-            for (f_it = remaining_fields.begin(); f_it != remaining_fields.end(); ++f_it) {
-                std::string field = *f_it;
-                // look for in new, updated and deleted
-                bool found = false;
-
-                std::vector<std::string>::iterator s_it;
-                s_it = std::find(log.new_f.begin(), log.new_f.end(), field);
-                if (s_it != log.new_f.end()) {
-                    found = true;
-                    // ROS_INFO_STREAM(" - f: " << field << " NEW");
-                    // RETRIEVE
-                    if (!loaded) {
-                        if (!this->ltm_get_diff(log.log_uid, diff)) {
-                            ROS_ERROR_STREAM(" - could not load trail entity register #: " << log.log_uid);
-                            break;
-                        }
-                        loaded = true;
-                    }
-                    this->retrace_retrieve_field(field, diff, entity);
-                }
-                if (!found) {
-                    s_it = std::find(log.updated_f.begin(), log.updated_f.end(), field);
-                    if (s_it != log.updated_f.end()) {
-                        found = true;
-                        // RETRIEVE
-                        // ROS_INFO_STREAM(" - f: " << field << " UPDATED");
-                        if (!loaded) {
-                            if (!this->ltm_get_diff(log.log_uid, diff)) {
-                                ROS_ERROR_STREAM(" - could not load trail entity register #: " << log.log_uid);
-                                break;
-                            }
-                            loaded = true;
-                        }
-                        this->retrace_retrieve_field(field, diff, entity);
-                    }
-                }
-                if (!found) {
-                    s_it = std::find(log.removed_f.begin(), log.removed_f.end(), field);
-                    if (s_it != log.removed_f.end()) {
-                        found = true;
-                        // OK (field is already null)
-                        // ROS_INFO_STREAM(" - f: " << field << " REMOVED");
-                    }
-                }
-                
-                if (found) {
-                    acquired_fields.insert(field);
-                    remaining_fields.erase(field);
-
-                    if (remaining_fields.empty()) {
-                        ROS_INFO_STREAM("Entity (" << entity_uid << ") retrace. Found all fields ("
-                                        << acquired_fields.size() << ").");
-                        return;
-                    }
-                } else {
-                    // ROS_INFO_STREAM(" - f: " << field << " - not found");
-                }
-            }    
-        }
-        // size_t n_acquired = acquired_fields.size();
-        // size_t n_missing = remaining_fields.size();
-        // std::vector<std::string> acquired(acquired_fields.begin(), acquired_fields.end());
-        // std::vector<std::string> missing(remaining_fields.begin(), remaining_fields.end());
-        // ROS_INFO_STREAM("Entity (" << entity_uid << ") retrace."
-        //                 << "\n - " << n_acquired << " fields were remembered: " << ltm::util::vector_to_str(acquired) 
-        //                 << ".\n - " << n_missing << " fields are unknown: " << ltm::util::vector_to_str(missing));
+    void PeopleEntityPlugin::copy_field(const std::string& field, EntityWithMetadataPtr &in, EntityMsg &out) {
+        EntityMsg _in = *in;
+        if (field == "name")                 out.name            = _in.name;
+        else if (field == "last_name")       out.last_name       = _in.last_name;
+        else if (field == "genre")           out.genre           = _in.genre;
+        else if (field == "country")         out.country         = _in.country;
+        else if (field == "city")            out.city            = _in.city;
+        else if (field == "birthday")        out.birthday        = _in.birthday;
+        else if (field == "age")             out.age             = _in.age;
+        else if (field == "body")            out.body            = _in.body;
+        else if (field == "face")            out.face            = _in.face;
+        else if (field == "emotion")         out.emotion         = _in.emotion;
+        else if (field == "stance")          out.stance          = _in.stance;
+        else if (field == "is_nerd")         out.is_nerd         = _in.is_nerd;
+        else if (field == "last_seen")       out.last_seen       = _in.last_seen;
+        else if (field == "last_interacted") out.last_interacted = _in.last_interacted;
     }
 
-    void PeopleEntityPlugin::retrace_retrieve_field(const std::string& name, EntityWithMetadataPtr &in, EntityMsg &out) {
-        EntityMsg _in = *in;
-
-        if (name == "name") {
-            out.name = _in.name;
-        }
-        else if (name == "last_name") {
-            out.last_name = _in.last_name;
-        }
-        else if (name == "genre") {
-            out.genre = _in.genre;
-        }
-        else if (name == "country") {
-            out.country = _in.country;
-        }
-        else if (name == "city") {
-            out.city = _in.city;
-        }
-        else if (name == "birthday") {
-            out.birthday = _in.birthday;
-        }
-        else if (name == "age") {
-            out.age = _in.age;
-        }
-        else if (name == "body") {
-            out.body = _in.body;
-        }
-        else if (name == "face") {
-            out.face = _in.face;
-        }
-        else if (name == "emotion") {
-            out.emotion = _in.emotion;
-        }
-        else if (name == "stance") {
-            out.stance = _in.stance;
-        }
-        else if (name == "is_nerd") {
-            out.is_nerd = _in.is_nerd;
-        }
-        else if (name == "last_seen") {
-            out.last_seen = _in.last_seen;
-        }
-        else if (name == "last_interacted") {
-            out.last_interacted = _in.last_interacted;
-        }
+    void PeopleEntityPlugin::fill_field_names(std::set<std::string> &names) {
+        names.insert("name");
+        names.insert("last_name");
+        names.insert("genre");
+        names.insert("country");
+        names.insert("city");
+        names.insert("birthday");
+        names.insert("age");
+        // names.insert("body");
+        // names.insert("face");
+        names.insert("emotion");
+        names.insert("stance");
+        names.insert("is_nerd");
+        names.insert("last_seen");
+        names.insert("last_interacted");
     }
 
     void PeopleEntityPlugin::build_null(EntityMsg &entity) {
